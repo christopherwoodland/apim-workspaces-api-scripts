@@ -7,8 +7,7 @@ out/
 *.log
 *.tmp
 *.cache
-scripts/logs/*.log
-scripts/logs/*.json
+scripts/logs/
 
 # VS Code and IDE
 .vscode/
@@ -20,6 +19,22 @@ node_modules/
 
 # Local settings
 scripts/.apim-workspace-wizard-web.settings.json
+
+# Secrets and local environment
+.env
+.env.*
+*.local
+*.local.json
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+**/secrets.json
+
+# Certificates and private keys
+*.pfx
+*.p12
+*.pem
+*.key
 
 # OS
 Thumbs.db
