@@ -26,7 +26,25 @@
     </div>
 
     <section id="wizardView">
-    <section class="card" id="basicsCard">
+    <div class="wizard-shell">
+    <aside class="card wizard-aside">
+      <h2>Run Plan</h2>
+      <ol class="wizard-plan">
+        <li>Pick subscription and APIM context.</li>
+        <li>Choose workspace mode and gateway options.</li>
+        <li>Review actions, run, and validate runtime.</li>
+      </ol>
+      <div class="context-chip-grid">
+        <div class="context-chip"><span>Subscription</span><strong id="ctxSubscription">Not selected</strong></div>
+        <div class="context-chip"><span>APIM</span><strong id="ctxApim">Not selected</strong></div>
+        <div class="context-chip"><span>Workspace</span><strong id="ctxWorkspace">Not set</strong></div>
+        <div class="context-chip"><span>Mode</span><strong id="ctxMode">create-default</strong></div>
+      </div>
+      <p class="hint">Tip: Use <strong>WhatIfOnly</strong> first when testing a new combination.</p>
+    </aside>
+
+    <div class="wizard-main">
+    <section class="card step-panel" data-step="1" id="basicsCard">
       <h2>Context</h2>
       <div class="row row-wrap">
         <div class="field grow">
@@ -48,9 +66,13 @@
         <span class="spinner" aria-hidden="true"></span>
         <span id="basicsProgressText">Loading context...</span>
       </div>
+
+      <div class="step-footer">
+        <button id="toGatewayBtn" class="btn primary" type="button">Continue to Gateway</button>
+      </div>
     </section>
 
-    <section class="card" id="gatewayCard">
+    <section class="card step-panel" data-step="2" id="gatewayCard">
       <h2>Gateway</h2>
       <div class="notice">
         Creating a dedicated gateway can incur additional costs based on selected units and network configuration.
@@ -139,9 +161,14 @@
           </div>
         </div>
       </div>
+
+      <div class="step-footer">
+        <button id="backToBasicsBtn" class="btn subtle" type="button">Back</button>
+        <button id="toReviewBtn" class="btn primary" type="button">Continue to Review</button>
+      </div>
     </section>
 
-    <section class="card" id="runCard">
+    <section class="card step-panel" data-step="3" id="runCard">
       <h2>Run</h2>
       <div class="run-grid">
         <div class="actions-col">
@@ -203,17 +230,31 @@
           </div>
         </div>
       </div>
+
+      <div class="step-footer">
+        <button id="backToGatewayBtn" class="btn subtle" type="button">Back</button>
+      </div>
     </section>
 
+    </div>
+    </div>
     </section>
 
     <section id="workspacesView" class="hidden">
       <section class="card">
         <h2>Workspace Inventory</h2>
         <p class="hint">Select subscription and APIM in Basics, then load workspace inventory. Delete is permanent.</p>
-        <div class="row row-wrap">
-          <button id="loadWorkspacesBtn" class="btn primary" type="button">Load Workspaces</button>
-          <button id="refreshWorkspacesBtn" class="btn subtle" type="button">Refresh</button>
+        <div class="workspace-toolbar">
+          <div class="row row-wrap">
+            <button id="loadWorkspacesBtn" class="btn primary" type="button">Load Workspaces</button>
+            <button id="refreshWorkspacesBtn" class="btn subtle" type="button">Refresh</button>
+          </div>
+          <div class="workspace-summary" id="workspaceSummary">
+            <span class="summary-chip">Total <strong id="wsCountChip">0</strong></span>
+            <span class="summary-chip ok">Associated <strong id="wsAssocYesChip">0</strong></span>
+            <span class="summary-chip warn">Not Associated <strong id="wsAssocNoChip">0</strong></span>
+            <span class="summary-chip muted">Unknown <strong id="wsAssocUnknownChip">0</strong></span>
+          </div>
         </div>
         <div id="workspaceProgress" class="inline-progress hidden" role="status" aria-live="polite">
           <span class="spinner" aria-hidden="true"></span>

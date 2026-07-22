@@ -2,6 +2,7 @@ const state = {
   subscriptions: [],
   apimServices: [],
   workspaces: [],
+  currentStep: 1,
 };
 
 const el = {
@@ -16,6 +17,14 @@ const el = {
   basicsCard: document.getElementById("basicsCard"),
   gatewayCard: document.getElementById("gatewayCard"),
   runCard: document.getElementById("runCard"),
+  toGatewayBtn: document.getElementById("toGatewayBtn"),
+  backToBasicsBtn: document.getElementById("backToBasicsBtn"),
+  toReviewBtn: document.getElementById("toReviewBtn"),
+  backToGatewayBtn: document.getElementById("backToGatewayBtn"),
+  ctxSubscription: document.getElementById("ctxSubscription"),
+  ctxApim: document.getElementById("ctxApim"),
+  ctxWorkspace: document.getElementById("ctxWorkspace"),
+  ctxMode: document.getElementById("ctxMode"),
 
   subscriptionSelect: document.getElementById("subscriptionSelect"),
   apimSelect: document.getElementById("apimSelect"),
@@ -67,6 +76,10 @@ const el = {
   workspaceProgress: document.getElementById("workspaceProgress"),
   workspaceProgressText: document.getElementById("workspaceProgressText"),
   workspacesTbody: document.getElementById("workspacesTbody"),
+  wsCountChip: document.getElementById("wsCountChip"),
+  wsAssocYesChip: document.getElementById("wsAssocYesChip"),
+  wsAssocNoChip: document.getElementById("wsAssocNoChip"),
+  wsAssocUnknownChip: document.getElementById("wsAssocUnknownChip"),
 
   output: document.getElementById("output"),
   status: document.getElementById("status"),
@@ -240,18 +253,37 @@ function setUrlActions(urls) {
   el.copyRuntimeUrlBtn.disabled = !runtime;
 }
 
+function refreshContextSummary() {
+  const sub = selectedSubscription();
+  const apim = selectedApim();
+  const workspace = (el.workspaceId?.value || "").trim();
+  const mode = el.mode?.value || "create-default";
+
+  if (el.ctxSubscription) el.ctxSubscription.textContent = sub?.id || "Not selected";
+  if (el.ctxApim) el.ctxApim.textContent = apim?.name || "Not selected";
+  if (el.ctxWorkspace) el.ctxWorkspace.textContent = workspace || "Not set";
+  if (el.ctxMode) el.ctxMode.textContent = mode;
+}
+
 function updateModePanels() {
   const mode = el.mode.value;
   el.dedicatedPanel.classList.toggle("hidden", mode !== "create-dedicated");
   el.verifyPanel.classList.toggle("hidden", mode !== "verify");
   el.runtimePanel.classList.toggle("hidden", mode !== "verify-runtime");
-  setActiveStep(mode === "create-dedicated" ? 2 : 1);
+  refreshContextSummary();
 }
 
 function setActiveStep(step) {
+  state.currentStep = step;
   for (const [idx, node] of [el.stepBasics, el.stepGateway, el.stepReview].entries()) {
     node.classList.toggle("active", idx + 1 === step);
   }
+
+  const panels = document.querySelectorAll("#wizardView .step-panel");
+  panels.forEach((panel) => {
+    const panelStep = Number(panel.dataset.step || "0");
+    panel.classList.toggle("active", panelStep === step);
+  });
 }
 
 function scrollToCard(card) {
@@ -479,6 +511,7 @@ async function loadSubscriptions(preferredId = null) {
     }
 
     appendOutput(`Loaded ${state.subscriptions.length} subscription(s).`);
+    refreshContextSummary();
   } catch (error) {
     appendOutput(`ERROR: ${error.message}`);
     alert(error.message);
@@ -520,6 +553,7 @@ async function loadApim(preferredName = null) {
     }
 
     appendOutput(`Loaded ${state.apimServices.length} APIM instance(s).`);
+    refreshContextSummary();
   } catch (error) {
     appendOutput(`ERROR: ${error.message}`);
     alert(error.message);
@@ -530,6 +564,25 @@ async function loadApim(preferredName = null) {
 }
 
 function renderWorkspaces() {
+  const summary = {
+    total: state.workspaces.length,
+    yes: 0,
+    no: 0,
+    unknown: 0,
+  };
+
+  for (const ws of state.workspaces) {
+    const assoc = (ws.defaultGatewayAssociated || "unknown").toLowerCase();
+    if (assoc === "yes") summary.yes += 1;
+    else if (assoc === "no") summary.no += 1;
+    else summary.unknown += 1;
+  }
+
+  if (el.wsCountChip) el.wsCountChip.textContent = String(summary.total);
+  if (el.wsAssocYesChip) el.wsAssocYesChip.textContent = String(summary.yes);
+  if (el.wsAssocNoChip) el.wsAssocNoChip.textContent = String(summary.no);
+  if (el.wsAssocUnknownChip) el.wsAssocUnknownChip.textContent = String(summary.unknown);
+
   if (!state.workspaces.length) {
     el.workspacesTbody.innerHTML = '<tr><td colspan="9" class="muted">No workspaces found.</td></tr>';
     return;
@@ -548,7 +601,11 @@ function renderWorkspaces() {
     tr.appendChild(dn);
 
     const assoc = document.createElement("td");
-    assoc.textContent = ws.defaultGatewayAssociated || "unknown";
+    const assocValue = ws.defaultGatewayAssociated || "unknown";
+    const assocPill = document.createElement("span");
+    assocPill.textContent = assocValue;
+    assocPill.className = "cell-pill " + (assocValue === "yes" ? "ok" : assocValue === "no" ? "warn" : "muted");
+    assoc.appendChild(assocPill);
     if (ws.defaultGatewayAssociationSource || ws.associationCheckError) {
       const titleParts = [];
       if (ws.defaultGatewayAssociationSource) {
@@ -562,7 +619,12 @@ function renderWorkspaces() {
     tr.appendChild(assoc);
 
     const st = document.createElement("td");
-    st.textContent = ws.state || "unknown";
+    const stateValue = ws.state || "unknown";
+    const statePill = document.createElement("span");
+    statePill.textContent = stateValue;
+    const stateClass = stateValue.toLowerCase() === "succeeded" ? "ok" : stateValue.toLowerCase() === "failed" ? "warn" : "muted";
+    statePill.className = `cell-pill ${stateClass}`;
+    st.appendChild(statePill);
     if (ws.stateSource) {
       st.title = `Source: ${ws.stateSource}`;
     }
@@ -597,46 +659,63 @@ function renderWorkspaces() {
     tr.appendChild(urlCell);
 
     const action = document.createElement("td");
+    const actionWrap = document.createElement("div");
+    actionWrap.className = "workspace-actions";
+    const primaryActions = document.createElement("div");
+    primaryActions.className = "workspace-actions-primary";
+    const advancedActions = document.createElement("div");
+    advancedActions.className = "workspace-actions-advanced hidden";
+
     const verify = document.createElement("button");
     verify.className = "btn subtle";
     verify.textContent = "Check Runtime";
     verify.addEventListener("click", () => verifyWorkspaceRuntime(ws.id || ws.name));
-    action.appendChild(verify);
+    primaryActions.appendChild(verify);
 
     const assocBtn = document.createElement("button");
     assocBtn.className = "btn subtle";
     assocBtn.textContent = "Assoc Default GW";
     assocBtn.addEventListener("click", () => associateDefaultGateway(ws.id || ws.name));
-    action.appendChild(document.createTextNode(" "));
-    action.appendChild(assocBtn);
+    primaryActions.appendChild(assocBtn);
+
+    const moreBtn = document.createElement("button");
+    moreBtn.className = "btn subtle";
+    moreBtn.type = "button";
+    moreBtn.textContent = "More";
+    moreBtn.addEventListener("click", () => {
+      const isHidden = advancedActions.classList.contains("hidden");
+      advancedActions.classList.toggle("hidden", !isHidden);
+      moreBtn.textContent = isHidden ? "Less" : "More";
+    });
+    primaryActions.appendChild(moreBtn);
 
     const checkAssocBtn = document.createElement("button");
     checkAssocBtn.className = "btn subtle";
     checkAssocBtn.textContent = "Check Assoc";
     checkAssocBtn.addEventListener("click", () => checkWorkspaceAssociation(ws.id || ws.name));
-    action.appendChild(document.createTextNode(" "));
-    action.appendChild(checkAssocBtn);
+    advancedActions.appendChild(checkAssocBtn);
 
     const diagBtn = document.createElement("button");
     diagBtn.className = "btn subtle";
     diagBtn.textContent = "Diagnose GW";
     diagBtn.addEventListener("click", () => diagnoseWorkspaceGateway(ws.id || ws.name, false));
-    action.appendChild(document.createTextNode(" "));
-    action.appendChild(diagBtn);
+    advancedActions.appendChild(diagBtn);
 
     const diagFixBtn = document.createElement("button");
     diagFixBtn.className = "btn subtle";
     diagFixBtn.textContent = "Diagnose+Fix GW";
     diagFixBtn.addEventListener("click", () => diagnoseWorkspaceGateway(ws.id || ws.name, true));
-    action.appendChild(document.createTextNode(" "));
-    action.appendChild(diagFixBtn);
+    advancedActions.appendChild(diagFixBtn);
 
     const del = document.createElement("button");
     del.className = "btn subtle";
     del.textContent = "Delete";
     del.addEventListener("click", () => deleteWorkspace(ws.id || ws.name));
-    action.appendChild(document.createTextNode(" "));
-    action.appendChild(del);
+    advancedActions.appendChild(del);
+
+    actionWrap.appendChild(primaryActions);
+    actionWrap.appendChild(advancedActions);
+    action.appendChild(actionWrap);
     tr.appendChild(action);
 
     el.workspacesTbody.appendChild(tr);
@@ -1174,6 +1253,7 @@ function applySettings(settings) {
 
   updateModePanels();
   updateSampleProfileUi();
+  refreshContextSummary();
 }
 
 async function initialize() {
@@ -1194,6 +1274,9 @@ async function initialize() {
 }
 
 el.mode.addEventListener("change", updateModePanels);
+el.workspaceId.addEventListener("input", refreshContextSummary);
+el.subscriptionSelect.addEventListener("change", refreshContextSummary);
+el.apimSelect.addEventListener("change", refreshContextSummary);
 el.sampleProfile.addEventListener("change", updateSampleProfileUi);
 el.deploySampleApi.addEventListener("change", updateSampleProfileUi);
 
@@ -1247,11 +1330,33 @@ el.stepReview.addEventListener("click", () => {
   scrollToCard(el.runCard);
 });
 
+el.toGatewayBtn?.addEventListener("click", () => {
+  setActiveStep(2);
+  scrollToCard(el.gatewayCard);
+});
+
+el.backToBasicsBtn?.addEventListener("click", () => {
+  setActiveStep(1);
+  scrollToCard(el.basicsCard);
+});
+
+el.toReviewBtn?.addEventListener("click", () => {
+  setActiveStep(3);
+  scrollToCard(el.runCard);
+});
+
+el.backToGatewayBtn?.addEventListener("click", () => {
+  setActiveStep(2);
+  scrollToCard(el.gatewayCard);
+});
+
 updateModePanels();
 updateSampleProfileUi();
 setActiveTab("wizard");
+setActiveStep(1);
 setValidationStatus("idle", "Not started");
 setUrlActions(null);
+refreshContextSummary();
 initialize();
 
 setApiResult(null, null);
