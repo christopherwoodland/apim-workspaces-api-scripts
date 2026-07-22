@@ -1,0 +1,26 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.cache
+scripts/logs/*.log
+scripts/logs/*.json
+
+# VS Code and IDE
+.vscode/
+*.user
+*.suo
+
+# Node artifacts (for web tooling if added later)
+node_modules/
+
+# Local settings
+scripts/.apim-workspace-wizard-web.settings.json
+
+# OS
+Thumbs.db
+.DS_Store

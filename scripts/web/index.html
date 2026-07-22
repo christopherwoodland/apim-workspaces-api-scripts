@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APIM Workspace Wizard (Local Web)</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-title">APIM Workspace Wizard</div>
+    <div class="hero-subtitle">Local web UI for create, verify, runtime diagnostics, and optional sample API deploy</div>
+  </header>
+
+  <nav class="portal-steps" aria-label="Wizard steps">
+    <button id="stepBasics" class="step active" type="button">1 Basics</button>
+    <button id="stepGateway" class="step" type="button">2 Gateway</button>
+    <button id="stepReview" class="step" type="button">3 Review + Run</button>
+  </nav>
+
+  <main class="layout">
+    <div class="tabbar">
+      <button id="tabWizardBtn" class="tab active" type="button">Wizard</button>
+      <button id="tabWorkspacesBtn" class="tab" type="button">Workspaces</button>
+    </div>
+
+    <section id="wizardView">
+    <section class="card" id="basicsCard">
+      <h2>Context</h2>
+      <div class="row row-wrap">
+        <div class="field grow">
+          <label for="subscriptionSelect">Subscription</label>
+          <select id="subscriptionSelect"></select>
+        </div>
+        <button id="loadSubscriptionsBtn" class="btn primary">Load</button>
+      </div>
+
+      <div class="row row-wrap">
+        <div class="field grow">
+          <label for="apimSelect">API Management</label>
+          <select id="apimSelect"></select>
+        </div>
+        <button id="loadApimBtn" class="btn primary">Load</button>
+        <button id="resetSettingsBtn" class="btn subtle">Reset Saved Settings</button>
+      </div>
+      <div id="basicsProgress" class="inline-progress hidden" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="basicsProgressText">Loading context...</span>
+      </div>
+    </section>
+
+    <section class="card" id="gatewayCard">
+      <h2>Gateway</h2>
+      <div class="notice">
+        Creating a dedicated gateway can incur additional costs based on selected units and network configuration.
+      </div>
+      <div class="grid two">
+        <div class="field">
+          <label for="mode">Mode</label>
+          <select id="mode">
+            <option value="create-default">create-default</option>
+            <option value="create-dedicated">create-dedicated</option>
+            <option value="verify">verify</option>
+            <option value="verify-runtime">verify-runtime</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="workspaceId">Workspace ID</label>
+          <input id="workspaceId" type="text" />
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="field">
+          <label for="displayName">Display Name</label>
+          <input id="displayName" type="text" />
+        </div>
+        <div class="field">
+          <label for="description">Description</label>
+          <input id="description" type="text" />
+        </div>
+      </div>
+
+      <div id="dedicatedPanel" class="panel hidden">
+        <h3 class="subhead">Gateway Details</h3>
+        <div class="grid three">
+          <div class="field">
+            <label for="networkResourceGroup">Network RG</label>
+            <input id="networkResourceGroup" type="text" />
+          </div>
+          <div class="field">
+            <label for="location">Location</label>
+            <input id="location" type="text" />
+          </div>
+          <div class="field">
+            <label for="networkMode">Network Mode</label>
+            <select id="networkMode">
+              <option value="integration">integration</option>
+              <option value="injection">injection</option>
+            </select>
+          </div>
+        </div>
+        <h3 class="subhead">Network</h3>
+        <div class="notice subtle">
+          Networking mode and virtual network settings can have long-running deployment impact.
+        </div>
+        <label class="check"><input id="skipWorkspaceCreate" type="checkbox" /> Skip workspace create (network prep only)</label>
+      </div>
+
+      <div id="verifyPanel" class="panel hidden">
+        <label class="check"><input id="strictVerify" type="checkbox" /> Strict verify (requires Display Name)</label>
+      </div>
+
+      <div id="runtimePanel" class="panel hidden">
+        <div class="grid four">
+          <div class="field">
+            <label for="apiPath">API Path</label>
+            <input id="apiPath" type="text" value="weather" />
+          </div>
+          <div class="field">
+            <label for="probePath">Probe Path</label>
+            <input id="probePath" type="text" value="/weather/seattle" />
+          </div>
+          <div class="field">
+            <label for="expectedStatusCodes">Expected</label>
+            <input id="expectedStatusCodes" type="text" value="200" />
+          </div>
+          <div class="field">
+            <label for="gatewayUrl">Gateway URL (optional)</label>
+            <input id="gatewayUrl" type="text" />
+          </div>
+        </div>
+        <div class="grid two">
+          <label class="check"><input id="collectDiagnostics" type="checkbox" checked /> Collect diagnostics</label>
+          <div class="field">
+            <label for="diagnosticsOutputPath">Diagnostics Output Path (optional)</label>
+            <input id="diagnosticsOutputPath" type="text" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="runCard">
+      <h2>Run</h2>
+      <div class="run-grid">
+        <div class="actions-col">
+          <label class="check"><input id="whatIfOnly" type="checkbox" /> WhatIfOnly</label>
+          <div class="row">
+            <button id="runBtn" class="btn primary">Run Wizard Action</button>
+            <button id="clearOutputBtn" class="btn subtle">Clear Output</button>
+          </div>
+          <p class="hint">No product is created unless Create test product (optional) is checked.</p>
+        </div>
+
+        <div class="sample-col">
+          <label class="check"><input id="deploySampleApi" type="checkbox" /> Also deploy sample API</label>
+          <label class="check"><input id="createSampleProduct" type="checkbox" /> Create test product (optional)</label>
+
+          <div class="grid two">
+            <div class="field">
+              <label for="sampleProfile">Sample Profile</label>
+              <select id="sampleProfile">
+                <option>Weather API</option>
+                <option>Echo API</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sampleBackendUrl">Sample Backend URL</label>
+              <input id="sampleBackendUrl" type="text" value="https://weather-api-cw001.mangomeadow-171b7d7e.eastus2.azurecontainerapps.io" />
+            </div>
+          </div>
+
+          <div class="profile-card" id="profileCard">
+            <span class="badge" id="profileBadge">WEATHER</span>
+            <span id="profileHint">Weather API uses the fake weather backend for quick APIM validation.</span>
+          </div>
+
+          <div class="panel auto-verify-panel">
+            <label class="check"><input id="autoVerifyRuntime" type="checkbox" /> Auto-run verify-runtime after successful create</label>
+            <div class="grid two compact">
+              <div class="field">
+                <label for="autoApiPath">Auto Verify API Path</label>
+                <input id="autoApiPath" type="text" value="weather" />
+              </div>
+              <div class="field">
+                <label for="autoProbePath">Auto Verify Probe Path</label>
+                <input id="autoProbePath" type="text" value="/weather/seattle" />
+              </div>
+              <div class="field">
+                <label for="autoExpectedStatusCodes">Auto Verify Expected Status</label>
+                <input id="autoExpectedStatusCodes" type="text" value="200" />
+              </div>
+              <div class="field">
+                <label for="autoRetryIntervalSeconds">Retry Interval (seconds)</label>
+                <input id="autoRetryIntervalSeconds" type="number" min="5" value="20" />
+              </div>
+              <div class="field">
+                <label for="autoTimeoutSeconds">Timeout (seconds)</label>
+                <input id="autoTimeoutSeconds" type="number" min="60" value="900" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    </section>
+
+    <section id="workspacesView" class="hidden">
+      <section class="card">
+        <h2>Workspace Inventory</h2>
+        <p class="hint">Select subscription and APIM in Basics, then load workspace inventory. Delete is permanent.</p>
+        <div class="row row-wrap">
+          <button id="loadWorkspacesBtn" class="btn primary" type="button">Load Workspaces</button>
+          <button id="refreshWorkspacesBtn" class="btn subtle" type="button">Refresh</button>
+        </div>
+        <div id="workspaceProgress" class="inline-progress hidden" role="status" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="workspaceProgressText">Loading workspace inventory...</span>
+        </div>
+        <div class="table-wrap">
+          <table class="workspace-table" id="workspacesTable">
+            <thead>
+              <tr>
+                <th>Workspace ID</th>
+                <th>Display Name</th>
+                <th>Default GW Assoc</th>
+                <th>State</th>
+                <th>State Source</th>
+                <th>Associated Gateways</th>
+                <th>API Count</th>
+                <th>Workspace Portal URL</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="workspacesTbody">
+              <tr><td colspan="9" class="muted">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="card output-card">
+      <div class="output-head">
+        <h2>Output</h2>
+        <div class="output-head-right">
+          <div id="validationStatus" class="validation-status idle">Validation: Not started</div>
+          <div id="status" class="status">Ready</div>
+        </div>
+      </div>
+      <div id="urlActions" class="url-actions hidden">
+        <div class="url-row">
+          <span class="url-label">Workspace Portal URL</span>
+          <input id="workspacePortalUrlText" class="url-text" type="text" readonly title="Workspace Portal URL" />
+          <button id="copyWorkspacePortalUrlBtn" class="btn subtle" type="button">Copy</button>
+        </div>
+        <div class="url-row">
+          <span class="url-label">Workspace ARM URL</span>
+          <input id="workspaceUrlText" class="url-text" type="text" readonly title="Workspace ARM URL" />
+          <button id="copyWorkspaceUrlBtn" class="btn subtle" type="button">Copy</button>
+        </div>
+        <div class="url-row">
+          <span class="url-label">Gateway URL</span>
+          <input id="gatewayUrlText" class="url-text" type="text" readonly title="Gateway URL" />
+          <button id="copyGatewayUrlBtn" class="btn subtle" type="button">Copy</button>
+        </div>
+        <div class="url-row">
+          <span class="url-label">Runtime URL</span>
+          <input id="runtimeUrlText" class="url-text" type="text" readonly title="Runtime URL" />
+          <button id="copyRuntimeUrlBtn" class="btn subtle" type="button">Copy</button>
+        </div>
+      </div>
+      <div id="progress" class="progress hidden"><div class="bar"></div></div>
+      <div id="validationBanner" class="validation-banner hidden"></div>
+      <div id="apiResultPanel" class="api-result-panel hidden">
+        <div class="api-result-head">
+          <span id="apiResultTitle" class="api-result-title">Last API Response</span>
+          <button id="copyApiResultBtn" class="btn subtle" type="button">Copy JSON</button>
+        </div>
+        <pre id="apiResultJson" class="api-result-json"></pre>
+      </div>
+      <pre id="output"></pre>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
