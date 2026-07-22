@@ -31,6 +31,38 @@ Optional but recommended:
 .\scripts\apim-workspace-wizard-web.ps1
 ```
 
+## Run the UI (Web Wizard)
+
+Run from the repository root:
+
+```powershell
+Set-Location C:\Users\cwoodland\dev\apim
+.\scripts\check-prereqs.ps1
+.\scripts\apim-workspace-wizard-web.ps1
+```
+
+When the server starts, open:
+
+- [http://localhost:5077](http://localhost:5077)
+
+Optional startup flags:
+
+```powershell
+# Use a different port
+.\scripts\apim-workspace-wizard-web.ps1 -Port 5080
+
+# Start server without auto-opening a browser
+.\scripts\apim-workspace-wizard-web.ps1 -NoBrowser
+```
+
+Stop the UI server:
+
+- Press Ctrl+C in the terminal running `apim-workspace-wizard-web.ps1`.
+
+If localhost:5077 is already in use:
+
+- Restart on a different port with `-Port` and browse to that port.
+
 1. Or run direct deployment flow:
 
 ```powershell

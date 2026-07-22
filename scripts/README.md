@@ -85,6 +85,40 @@ Quick start:
   -CollectDiagnostics
 ```
 
+## Run the Local Web UI
+
+Run from repository root:
+
+```powershell
+Set-Location C:\Users\cwoodland\dev\apim
+.\scripts\check-prereqs.ps1
+.\scripts\apim-workspace-wizard-web.ps1
+```
+
+UI address:
+
+- [http://localhost:5077](http://localhost:5077)
+
+Optional flags:
+
+```powershell
+# Change listening port
+.\scripts\apim-workspace-wizard-web.ps1 -Port 5080
+
+# Start server without opening browser
+.\scripts\apim-workspace-wizard-web.ps1 -NoBrowser
+```
+
+Stop the server:
+
+- Press Ctrl+C in the terminal where the script is running.
+
+Common startup issues:
+
+- Port already in use: start with `-Port 5080` (or another free port).
+- Azure CLI not signed in: run `az login` first.
+- Missing permissions for subscription/APIM reads: ensure your account has at least Reader on target scope.
+
 ## Files
 
 - apim-workspace-wizard-web.ps1
