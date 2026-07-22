@@ -8,6 +8,7 @@ const state = {
 const el = {
   tabWizardBtn: document.getElementById("tabWizardBtn"),
   tabWorkspacesBtn: document.getElementById("tabWorkspacesBtn"),
+  openHelpBtn: document.getElementById("openHelpBtn"),
   wizardView: document.getElementById("wizardView"),
   workspacesView: document.getElementById("workspacesView"),
 
@@ -103,7 +104,81 @@ const el = {
   profileCard: document.getElementById("profileCard"),
   profileBadge: document.getElementById("profileBadge"),
   profileHint: document.getElementById("profileHint"),
+  helpModal: document.getElementById("helpModal"),
+  closeHelpModalBtn: document.getElementById("closeHelpModalBtn"),
 };
+
+function setCardCollapsed(card, collapsed) {
+  if (!card) return;
+  card.classList.toggle("is-collapsed", !!collapsed);
+  const toggleBtn = card.querySelector(".card-collapse-btn");
+  if (toggleBtn) {
+    toggleBtn.textContent = collapsed ? "Expand" : "Collapse";
+    toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  }
+}
+
+function attachCollapseToggle(card, headerHost, initiallyCollapsed = false) {
+  if (!card || !headerHost) return;
+  if (card.querySelector(".card-collapse-btn")) return;
+
+  headerHost.classList.add("card-title-row");
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn subtle card-collapse-btn";
+  btn.title = "Collapse or expand this section";
+  btn.addEventListener("click", () => {
+    const willCollapse = !card.classList.contains("is-collapsed");
+    setCardCollapsed(card, willCollapse);
+  });
+
+  headerHost.appendChild(btn);
+  setCardCollapsed(card, initiallyCollapsed);
+}
+
+function initializeCollapsibleSections() {
+  attachCollapseToggle(el.basicsCard, el.basicsCard?.querySelector(":scope > h2"), false);
+  attachCollapseToggle(el.gatewayCard, el.gatewayCard?.querySelector(":scope > h2"), false);
+  attachCollapseToggle(el.runCard, el.runCard?.querySelector(":scope > h2"), false);
+
+  const workspaceCard = document.querySelector("#workspacesView .card");
+  attachCollapseToggle(workspaceCard, workspaceCard?.querySelector(":scope > h2"), false);
+
+  const outputCard = document.querySelector(".output-card");
+  attachCollapseToggle(outputCard, outputCard?.querySelector(":scope > .output-head"), false);
+}
+
+function openHelpModal() {
+  if (!el.helpModal) return;
+  el.helpModal.classList.remove("hidden");
+}
+
+function closeHelpModal() {
+  if (!el.helpModal) return;
+  el.helpModal.classList.add("hidden");
+}
+
+function initializeButtonTooltips() {
+  const tips = [
+    [el.loadSubscriptionsBtn, "Load subscriptions available in your signed-in Azure context"],
+    [el.loadApimBtn, "Load API Management services from the selected subscription"],
+    [el.resetSettingsBtn, "Delete saved local wizard settings and reload defaults"],
+    [el.runBtn, "Run the selected workspace action with current form values"],
+    [el.clearOutputBtn, "Clear run output and last API response from this page"],
+    [el.loadWorkspacesBtn, "Load workspace inventory for selected APIM service"],
+    [el.refreshWorkspacesBtn, "Refresh workspace inventory and status values"],
+    [el.copyWorkspacePortalUrlBtn, "Copy workspace Portal URL to clipboard"],
+    [el.copyWorkspaceUrlBtn, "Copy workspace ARM URL to clipboard"],
+    [el.copyGatewayUrlBtn, "Copy gateway base URL to clipboard"],
+    [el.copyRuntimeUrlBtn, "Copy runtime test URL to clipboard"],
+    [el.openHelpBtn, "Open help for button actions"],
+  ];
+
+  for (const [node, text] of tips) {
+    if (node && !node.title) node.title = text;
+  }
+}
 
 function appendOutput(text) {
   if (!text) return;
@@ -283,6 +358,9 @@ function setActiveStep(step) {
   panels.forEach((panel) => {
     const panelStep = Number(panel.dataset.step || "0");
     panel.classList.toggle("active", panelStep === step);
+    if (panelStep === step) {
+      setCardCollapsed(panel, false);
+    }
   });
 }
 
@@ -669,52 +747,80 @@ function renderWorkspaces() {
     const verify = document.createElement("button");
     verify.className = "btn subtle";
     verify.textContent = "Check Runtime";
+    verify.title = "Run verify-runtime probe for this workspace route";
     verify.addEventListener("click", () => verifyWorkspaceRuntime(ws.id || ws.name));
     primaryActions.appendChild(verify);
 
     const assocBtn = document.createElement("button");
     assocBtn.className = "btn subtle";
     assocBtn.textContent = "Assoc Default GW";
+    assocBtn.title = "Set workspace to serve on default APIM gateway";
     assocBtn.addEventListener("click", () => associateDefaultGateway(ws.id || ws.name));
     primaryActions.appendChild(assocBtn);
 
     const moreBtn = document.createElement("button");
     moreBtn.className = "btn subtle";
     moreBtn.type = "button";
-    moreBtn.textContent = "More";
+    moreBtn.textContent = "Advanced";
+    moreBtn.title = "Show advanced workspace checks and diagnostics";
+
+    const advancedHint = document.createElement("span");
+    advancedHint.className = "workspace-advanced-hint hidden";
+    advancedHint.textContent = "Includes: Check Assoc, Diagnose GW, Diagnose+Fix GW";
+
+    const advancedInfo = document.createElement("span");
+    advancedInfo.className = "info-dot";
+    advancedInfo.textContent = "i";
+    advancedInfo.title = "Advanced tools are for deeper troubleshooting and optional remediation.";
+
     moreBtn.addEventListener("click", () => {
       const isHidden = advancedActions.classList.contains("hidden");
       advancedActions.classList.toggle("hidden", !isHidden);
-      moreBtn.textContent = isHidden ? "Less" : "More";
+      advancedHint.classList.toggle("hidden", !isHidden);
+      moreBtn.textContent = isHidden ? "Hide Advanced" : "Advanced";
     });
     primaryActions.appendChild(moreBtn);
+    primaryActions.appendChild(advancedInfo);
 
     const checkAssocBtn = document.createElement("button");
     checkAssocBtn.className = "btn subtle";
     checkAssocBtn.textContent = "Check Assoc";
+    checkAssocBtn.title = "Read association status from ARM preview endpoints";
     checkAssocBtn.addEventListener("click", () => checkWorkspaceAssociation(ws.id || ws.name));
     advancedActions.appendChild(checkAssocBtn);
 
     const diagBtn = document.createElement("button");
     diagBtn.className = "btn subtle";
     diagBtn.textContent = "Diagnose GW";
+    diagBtn.title = "Run gateway diagnosis without applying changes";
     diagBtn.addEventListener("click", () => diagnoseWorkspaceGateway(ws.id || ws.name, false));
     advancedActions.appendChild(diagBtn);
 
     const diagFixBtn = document.createElement("button");
     diagFixBtn.className = "btn subtle";
     diagFixBtn.textContent = "Diagnose+Fix GW";
+    diagFixBtn.title = "Run gateway diagnosis and apply default-gateway association fix";
     diagFixBtn.addEventListener("click", () => diagnoseWorkspaceGateway(ws.id || ws.name, true));
     advancedActions.appendChild(diagFixBtn);
 
     const del = document.createElement("button");
-    del.className = "btn subtle";
-    del.textContent = "Delete";
+    del.className = "btn danger";
+    del.textContent = "Delete Workspace";
+    del.title = "Permanent action: delete workspace from APIM";
     del.addEventListener("click", () => deleteWorkspace(ws.id || ws.name));
-    advancedActions.appendChild(del);
+    const deleteInfo = document.createElement("span");
+    deleteInfo.className = "info-dot warn";
+    deleteInfo.textContent = "!";
+    deleteInfo.title = "Delete permanently removes the workspace. Use only when you are sure.";
+    const deleteZone = document.createElement("div");
+    deleteZone.className = "workspace-actions-danger";
+    deleteZone.appendChild(del);
+    deleteZone.appendChild(deleteInfo);
 
     actionWrap.appendChild(primaryActions);
+    actionWrap.appendChild(advancedHint);
     actionWrap.appendChild(advancedActions);
+    actionWrap.appendChild(deleteZone);
     action.appendChild(actionWrap);
     tr.appendChild(action);
 
@@ -1314,6 +1420,18 @@ el.tabWizardBtn.addEventListener("click", () => setActiveTab("wizard"));
 el.tabWorkspacesBtn.addEventListener("click", () => setActiveTab("workspaces"));
 el.loadWorkspacesBtn.addEventListener("click", loadWorkspaces);
 el.refreshWorkspacesBtn.addEventListener("click", loadWorkspaces);
+el.openHelpBtn?.addEventListener("click", openHelpModal);
+el.closeHelpModalBtn?.addEventListener("click", closeHelpModal);
+el.helpModal?.addEventListener("click", (event) => {
+  if (event.target === el.helpModal) {
+    closeHelpModal();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && el.helpModal && !el.helpModal.classList.contains("hidden")) {
+    closeHelpModal();
+  }
+});
 
 el.stepBasics.addEventListener("click", () => {
   setActiveStep(1);
@@ -1352,6 +1470,8 @@ el.backToGatewayBtn?.addEventListener("click", () => {
 
 updateModePanels();
 updateSampleProfileUi();
+initializeCollapsibleSections();
+initializeButtonTooltips();
 setActiveTab("wizard");
 setActiveStep(1);
 setValidationStatus("idle", "Not started");

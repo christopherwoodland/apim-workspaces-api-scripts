@@ -443,6 +443,9 @@ function Get-WorkspaceInventory {
 
             if ($assoc.WorkspaceGatewaysText -and $assoc.WorkspaceGatewaysText -ne "not-returned-by-arm") {
                 $associatedGateways = $assoc.WorkspaceGatewaysText
+            } elseif ($assoc.DefaultGatewayAssociated -eq "yes" -and $associatedGateways -eq "not-returned-by-arm") {
+                # Some SKUs/API versions do not return workspace gateway list; infer default gateway path from serveOn.
+                $associatedGateways = "default-shared-gateway-inferred"
             }
 
             $items += [pscustomobject]@{
@@ -1098,7 +1101,7 @@ try {
                     $serverOutput += "ERROR: Diagnose endpoint failed before completion."
                     $serverOutput += ("ERROR: " + $err)
                     if ($invokeArgs.Count -gt 0) {
-                        $serverOutput += "Args at failure:" 
+                        $serverOutput += "Args at failure:"
                         $serverOutput += (Convert-ArgToTraceLine -NamedArgs $invokeArgs)
                     }
                     if ($_.ScriptStackTrace) {

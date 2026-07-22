@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <div id="progress" class="progress progress-top hidden" aria-hidden="true"><div class="bar"></div></div>
   <header class="hero">
     <div class="hero-title">APIM Workspace Wizard</div>
     <div class="hero-subtitle">Local web UI for create, verify, runtime diagnostics, and optional sample API deploy</div>
@@ -23,6 +24,7 @@
     <div class="tabbar">
       <button id="tabWizardBtn" class="tab active" type="button">Wizard</button>
       <button id="tabWorkspacesBtn" class="tab" type="button">Workspaces</button>
+      <button id="openHelpBtn" class="btn subtle tab-help-btn" type="button">Help</button>
     </div>
 
     <section id="wizardView">
@@ -313,7 +315,6 @@
           <button id="copyRuntimeUrlBtn" class="btn subtle" type="button">Copy</button>
         </div>
       </div>
-      <div id="progress" class="progress hidden"><div class="bar"></div></div>
       <div id="validationBanner" class="validation-banner hidden"></div>
       <div id="apiResultPanel" class="api-result-panel hidden">
         <div class="api-result-head">
@@ -325,6 +326,30 @@
       <pre id="output"></pre>
     </section>
   </main>
+
+  <div id="helpModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="helpModalTitle">What Each Button Does</h3>
+        <button id="closeHelpModalBtn" class="btn subtle" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Wizard</strong></p>
+        <ul>
+          <li><strong>Load (Subscription/APIM)</strong>: refreshes selectable Azure context.</li>
+          <li><strong>Run Wizard Action</strong>: executes the selected workflow mode.</li>
+          <li><strong>Clear Output</strong>: clears the local output console and response panel.</li>
+        </ul>
+        <p><strong>Workspace Row Actions</strong></p>
+        <ul>
+          <li><strong>Check Runtime</strong>: validates runtime route and expected status.</li>
+          <li><strong>Assoc Default GW</strong>: sets workspace to serve on default gateway.</li>
+          <li><strong>Advanced</strong>: expands advanced diagnostics actions.</li>
+          <li><strong>Delete Workspace</strong>: permanently removes workspace from APIM.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>
