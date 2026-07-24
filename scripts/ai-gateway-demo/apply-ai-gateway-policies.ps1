@@ -25,6 +25,9 @@ param(
     [string]$OperationId = "post-chat-completions",
 
     [Parameter()]
+    [string]$BackendUrl,
+
+    [Parameter()]
     [int]$TokensPerMinute = 20000,
 
     [Parameter()]
@@ -100,9 +103,16 @@ function Invoke-AzCli {
         return $null
     }
 
-    $output = & az @Args
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & az @Args 2>&1
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     if ($LASTEXITCODE -ne 0) {
-        throw "Azure CLI command failed: az $($displayArgs -join ' ')"
+        $detail = ($output | ForEach-Object { $_.ToString() }) -join "`n"
+        throw "Azure CLI command failed: az $($displayArgs -join ' ')`n$detail"
     }
 
     if ($null -eq $output) {
@@ -127,18 +137,57 @@ function Invoke-ApimRest {
     $url = "https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.ApiManagement/service/{2}/{3}?api-version={4}" -f `
         $SubscriptionId, $ResourceGroupName, $ApimName, $RelativePath.TrimStart('/'), $ApiVersion
 
-    $args = @("rest", "--method", $Method, "--url", $url, "-o", "json")
+    $args = @("rest", "--method", $Method, "--url", $url)
+    if ($Method -eq "GET") {
+        $args += @("-o", "json")
+    } else {
+        $args += @("-o", "none")
+    }
 
     $bodyFile = $null
     try {
         if ($null -ne $BodyObject) {
             $payload = $BodyObject | ConvertTo-Json -Depth 50 -Compress
             $bodyFile = Join-Path $env:TEMP ("apim-ai-policy-body-" + [guid]::NewGuid().ToString() + ".json")
-            Set-Content -Path $bodyFile -Value $payload -Encoding UTF8
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            [System.IO.File]::WriteAllText($bodyFile, $payload, $utf8NoBom)
             $args += @("--headers", "Content-Type=application/json", "--body", "@$bodyFile")
         }
 
-        return Invoke-AzCli -Args $args -ReadOnly:($Method -eq "GET")
+        try {
+            return Invoke-AzCli -Args $args -ReadOnly:($Method -eq "GET")
+        } catch {
+            $message = $_.Exception.Message
+            $isEncodingFailure = ($message -match "UnicodeEncodeError") -or ($message -match "Unexpected UTF-8 BOM") -or ($message -match "charmap")
+            if (-not $isEncodingFailure) {
+                throw
+            }
+
+            Write-Log -Level "WARN" -Message "Azure CLI rest call hit encoding issue; retrying with direct ARM REST call."
+
+            $token = Invoke-AzCli -Args @(
+                "account", "get-access-token",
+                "--resource", "https://management.azure.com/",
+                "--query", "accessToken",
+                "-o", "tsv"
+            ) -ReadOnly
+
+            if ([string]::IsNullOrWhiteSpace($token)) {
+                throw "Could not retrieve ARM access token for fallback request."
+            }
+
+            $headers = @{
+                Authorization = "Bearer $token"
+            }
+
+            if ($null -ne $BodyObject) {
+                $fallbackPayload = $BodyObject | ConvertTo-Json -Depth 50 -Compress
+                Invoke-RestMethod -Method $Method -Uri $url -Headers $headers -ContentType "application/json" -Body $fallbackPayload -ErrorAction Stop | Out-Null
+                return $null
+            }
+
+            return (Invoke-RestMethod -Method $Method -Uri $url -Headers $headers -ErrorAction Stop | ConvertTo-Json -Depth 50)
+        }
     }
     finally {
         if ($bodyFile -and (Test-Path $bodyFile)) {
@@ -147,30 +196,60 @@ function Invoke-ApimRest {
     }
 }
 
+function Resolve-BackendUrl {
+    if (-not [string]::IsNullOrWhiteSpace($BackendUrl)) {
+        return $BackendUrl.TrimEnd('/')
+    }
+
+    $endpoint = Invoke-AzCli -Args @(
+        "cognitiveservices", "account", "show",
+        "--name", $OpenAiAccountName,
+        "--resource-group", $ResourceGroupName,
+        "--query", "properties.endpoint",
+        "-o", "tsv"
+    ) -ReadOnly
+
+    if ([string]::IsNullOrWhiteSpace($endpoint)) {
+        throw "Unable to resolve endpoint for cognitive account '$OpenAiAccountName'."
+    }
+
+    $baseEndpoint = $endpoint.TrimEnd('/')
+    if ($baseEndpoint -match "services\.ai\.azure\.com/api/projects") {
+        return $baseEndpoint
+    }
+
+    return ($baseEndpoint + "/openai")
+}
+
 function Get-PolicyXml {
-    $tokenLimitCounterKey = "@(context.Subscription?.Key ?? context.Request.IpAddress ?? 'anonymous')"
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedBackendUrl
+    )
+
+    $tokenLimitCounterKey = "@((context.Subscription != null && !string.IsNullOrEmpty(context.Subscription.Key)) ? context.Subscription.Key : context.Request.IpAddress)"
 
     $xml = @"
 <policies>
   <inbound>
     <base />
-    <set-backend-service backend-id=\"aoai-backend\" />
-    <authentication-managed-identity resource=\"https://cognitiveservices.azure.com\" output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />
-    <set-header name=\"Authorization\" exists-action=\"override\">
-      <value>@(""Bearer "" + (string)context.Variables[""msi-access-token""])</value>
+        <set-backend-service base-url="$ResolvedBackendUrl" />
+        <authentication-managed-identity resource="https://cognitiveservices.azure.com" output-token-variable-name="msi-access-token" ignore-error="false" />
+        <set-header name="Authorization" exists-action="override">
+            <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
     </set-header>
-    <set-header name=\"api-key\" exists-action=\"delete\" />
+        <set-header name="api-key" exists-action="delete" />
 
-    <azure-openai-token-limit counter-key=\"$tokenLimitCounterKey\" tokens-per-minute=\"$TokensPerMinute\" estimate-prompt-tokens=\"true\" />
+        <azure-openai-token-limit counter-key="$tokenLimitCounterKey" tokens-per-minute="$TokensPerMinute" estimate-prompt-tokens="true" />
 
-    <rate-limit-by-key calls=\"$RateLimitCalls\" renewal-period=\"$RateLimitRenewalPeriod\" counter-key=\"$tokenLimitCounterKey\" />
+        <rate-limit-by-key calls="$RateLimitCalls" renewal-period="$RateLimitRenewalPeriod" counter-key="$tokenLimitCounterKey" />
 
-    <rewrite-uri template=\"/openai/deployments/$OpenAiDeploymentName/chat/completions?api-version=2024-02-01\" copy-unmatched-params=\"false\" />
+        <rewrite-uri template="/openai/deployments/$OpenAiDeploymentName/chat/completions?api-version=2024-02-01" copy-unmatched-params="false" />
 
     <!-- Optional policy placeholders for a live demo sequence -->
     <!--
-    <azure-openai-semantic-cache-lookup score-threshold=\"0.8\" />
-    <llm-content-safety shield-prompt=\"true\" />
+    <azure-openai-semantic-cache-lookup score-threshold="0.8" />
+    <llm-content-safety shield-prompt="true" />
     -->
   </inbound>
   <backend>
@@ -178,8 +257,7 @@ function Get-PolicyXml {
   </backend>
   <outbound>
     <base />
-    <!-- <azure-openai-semantic-cache-store duration=\"300\" /> -->
-    <azure-openai-emit-token-metric namespace=\"apim-ai-gateway-demo\" />
+    <!-- <azure-openai-semantic-cache-store duration="300" /> -->
   </outbound>
   <on-error>
     <base />
@@ -195,7 +273,8 @@ Write-Log -Level "INFO" -Message "Run started. Log file: $LogFile"
 Write-Log -Level "INFO" -Message "Selecting subscription"
 Invoke-AzCli -Args @("account", "set", "--subscription", $SubscriptionId) -ReadOnly | Out-Null
 
-$policyXml = Get-PolicyXml
+$resolvedBackendUrl = Resolve-BackendUrl
+$policyXml = Get-PolicyXml -ResolvedBackendUrl $resolvedBackendUrl
 
 if ([string]::IsNullOrWhiteSpace($PolicyOutputPath)) {
     $PolicyOutputPath = Join-Path $PSScriptRoot "policies/ai-gateway-operation-policy.xml"

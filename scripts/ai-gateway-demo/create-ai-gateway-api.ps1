@@ -34,6 +34,9 @@ param(
     [string]$BackendId = "aoai-backend",
 
     [Parameter()]
+    [string]$BackendUrl,
+
+    [Parameter()]
     [string]$ApiVersion = "2024-10-01-preview",
 
     [Parameter()]
@@ -128,14 +131,20 @@ function Invoke-ApimRest {
     $url = "https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.ApiManagement/service/{2}/{3}?api-version={4}" -f `
         $SubscriptionId, $ResourceGroupName, $ApimName, $RelativePath.TrimStart('/'), $ApiVersion
 
-    $args = @("rest", "--method", $Method, "--url", $url, "-o", "json")
+    $args = @("rest", "--method", $Method, "--url", $url)
+    if ($Method -eq "GET") {
+        $args += @("-o", "json")
+    } else {
+        $args += @("-o", "none")
+    }
 
     $bodyFile = $null
     try {
         if ($null -ne $BodyObject) {
             $payload = $BodyObject | ConvertTo-Json -Depth 50 -Compress
             $bodyFile = Join-Path $env:TEMP ("apim-ai-gateway-body-" + [guid]::NewGuid().ToString() + ".json")
-            Set-Content -Path $bodyFile -Value $payload -Encoding UTF8
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            [System.IO.File]::WriteAllText($bodyFile, $payload, $utf8NoBom)
             $args += @("--headers", "Content-Type=application/json", "--body", "@$bodyFile")
         }
 
@@ -164,8 +173,33 @@ function Resolve-ApimPrincipalId {
     return $json.Trim()
 }
 
+function Resolve-BackendUrl {
+    if (-not [string]::IsNullOrWhiteSpace($BackendUrl)) {
+        return $BackendUrl.TrimEnd('/')
+    }
+
+    $endpoint = Invoke-AzCli -Args @(
+        "cognitiveservices", "account", "show",
+        "--name", $OpenAiAccountName,
+        "--resource-group", $ResourceGroupName,
+        "--query", "properties.endpoint",
+        "-o", "tsv"
+    ) -ReadOnly
+
+    if ([string]::IsNullOrWhiteSpace($endpoint)) {
+        throw "Unable to resolve endpoint for cognitive account '$OpenAiAccountName'."
+    }
+
+    $baseEndpoint = $endpoint.TrimEnd('/')
+    if ($baseEndpoint -match "services\.ai\.azure\.com/api/projects") {
+        return $baseEndpoint
+    }
+
+    return ($baseEndpoint + "/openai")
+}
+
 function Ensure-Backend {
-    $backendUrl = "https://{0}.openai.azure.com/openai" -f $OpenAiAccountName
+    $backendUrl = Resolve-BackendUrl
 
     $backendBody = @{
         properties = @{
@@ -177,7 +211,13 @@ function Ensure-Backend {
     }
 
     Write-Log -Level "INFO" -Message "Creating or updating backend '$BackendId' -> $backendUrl"
-    Invoke-ApimRest -Method "PUT" -RelativePath ("backends/{0}" -f $BackendId) -BodyObject $backendBody | Out-Null
+
+    try {
+        Invoke-ApimRest -Method "PUT" -RelativePath ("workspaces/{0}/backends/{1}" -f $WorkspaceId, $BackendId) -BodyObject $backendBody | Out-Null
+        Write-Log -Level "INFO" -Message "Workspace backend '$BackendId' is ready."
+    } catch {
+        Write-Log -Level "WARN" -Message ("Workspace backend create failed; continuing with policy base-url fallback. Details: {0}" -f $_.Exception.Message)
+    }
 }
 
 function Ensure-Api {
@@ -208,7 +248,7 @@ function Ensure-Api {
             protocols = @("https")
             format = "openapi+json"
             value = ($openApiDocument | ConvertTo-Json -Depth 20 -Compress)
-            subscriptionRequired = $true
+            subscriptionRequired = $false
         }
     }
 

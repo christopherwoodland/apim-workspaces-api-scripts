@@ -18,7 +18,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OpenAiDeploymentName,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter()]
     [string]$SubscriptionKey,
 
     [Parameter()]
@@ -162,8 +162,10 @@ function Invoke-DemoCall {
     } | ConvertTo-Json -Depth 8
 
     $headers = @{
-        "Ocp-Apim-Subscription-Key" = $SubscriptionKey
         "Content-Type" = "application/json"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SubscriptionKey)) {
+        $headers["Ocp-Apim-Subscription-Key"] = $SubscriptionKey
     }
 
     $statusCode = $null

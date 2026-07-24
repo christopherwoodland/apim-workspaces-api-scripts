@@ -29,6 +29,43 @@ This folder contains a runnable demo flow to show Azure API Management (APIM) as
   - Calls the API endpoint twice and prints status + latency to support live demo talk track.
 - `demo-ai-gateway-limit-exceeded.ps1`
   - Applies restrictive policy values and runs repeated/large calls to force a visible policy enforcement response (typically HTTP 429).
+- `start-ai-gateway-demo-wizard.ps1`
+  - Starts a local click-through wizard for the live demo flow with one button per step.
+  - Serves UI from `web/index.html` and executes steps via local API endpoints.
+
+## Wizard UI (recommended for live talk)
+
+```powershell
+.\scripts\ai-gateway-demo\start-ai-gateway-demo-wizard.ps1
+```
+
+Default URL:
+
+- http://localhost:5088
+
+Optional flags:
+
+```powershell
+# Change port
+.\scripts\ai-gateway-demo\start-ai-gateway-demo-wizard.ps1 -Port 5090
+
+# Do not auto-open browser
+.\scripts\ai-gateway-demo\start-ai-gateway-demo-wizard.ps1 -NoBrowser
+```
+
+The wizard is prefilled with these defaults and runs these actions in order:
+
+- Subscription: `6bf68138-6ea4-4272-a3db-78e737e132a6`
+- Resource Group: `integration`
+- APIM: `intapim001`
+- Workspace: `cw11`
+- OpenAI Account: `bhs-development-public-foundry-r`
+- Deployment: `gpt-4.1`
+
+1. Create API + backend + RBAC
+2. Apply AI gateway policies
+3. Run baseline demo calls
+4. Run enforcement demo (attempts to trigger 429)
 
 ## Run order
 
@@ -72,23 +109,18 @@ $deployment = "<azure-openai-deployment-name>"
   -RateLimitRenewalPeriod 60
 ```
 
-### 3) Get a subscription key and run demo calls
+### 3) Run demo calls (no APIM subscription key required)
 
 ```powershell
-# Example: list APIM subscriptions and retrieve keys
-az apim subscription list --resource-group $rg --service-name $apim -o table
-az apim subscription keys list --resource-group $rg --service-name $apim --sid <subscription-id-or-name>
-
-$key = "<ocp-apim-subscription-key>"
-
 .\scripts\ai-gateway-demo\demo-ai-gateway.ps1 `
   -SubscriptionId $sub `
   -ResourceGroupName $rg `
   -ApimName $apim `
   -WorkspaceId $ws `
-  -ApiPath "ai/chat" `
-  -SubscriptionKey $key
+  -ApiPath "ai/chat"
 ```
+
+Optional: if your APIM instance still enforces subscription keys, add `-SubscriptionKey <key>`.
 
 ### 4) Run one-command policy enforcement demo (limit exceeded)
 
@@ -100,11 +132,12 @@ $key = "<ocp-apim-subscription-key>"
   -WorkspaceId $ws `
   -OpenAiAccountName $aoai `
   -OpenAiDeploymentName $deployment `
-  -SubscriptionKey $key `
   -TokensPerMinute 120 `
   -RateLimitCalls 1 `
   -RateLimitRenewalPeriod 60
 ```
+
+Optional: add `-SubscriptionKey <key>` if APIM requires subscriptions in your environment.
 
 If your environment does not return a `429` on the first run, reduce `-TokensPerMinute` further (for example `60`) and retry.
 
@@ -120,3 +153,4 @@ If your environment does not return a `429` on the first run, reduce `-TokensPer
 
 - `apply-ai-gateway-policies.ps1` includes commented placeholders for semantic cache and content safety policies. Enable these once your APIM SKU/feature set is confirmed in your environment.
 - API management REST `api-version` is set to `2024-10-01-preview` for workspace policy/API operations.
+- This demo is workspace-scoped (all API and policy operations target `.../workspaces/<workspaceId>/...`).

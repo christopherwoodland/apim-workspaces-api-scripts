@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Gateway Demo Wizard</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>AI Gateway Demo Wizard</h1>
+    <p>Click through each APIM step in order during your talk track.</p>
+  </header>
+
+  <main class="layout">
+    <section class="card form-card">
+      <h2>Demo Context</h2>
+      <div class="grid three">
+        <label>Subscription ID
+          <input id="subscriptionId" type="text" value="6bf68138-6ea4-4272-a3db-78e737e132a6" />
+        </label>
+        <label>Resource Group
+          <input id="resourceGroupName" type="text" value="integration" />
+        </label>
+        <label>APIM Name
+          <input id="apimName" type="text" value="intapim001" />
+        </label>
+      </div>
+      <div class="grid two">
+        <label>Workspace ID
+          <input id="workspaceId" type="text" value="cw11" />
+        </label>
+        <label>Azure OpenAI Account
+          <input id="openAiAccountName" type="text" value="bhs-development-public-foundry-r" />
+        </label>
+      </div>
+      <div class="grid two">
+        <label>Azure OpenAI Deployment
+          <input id="openAiDeploymentName" type="text" value="gpt-4.1" />
+        </label>
+        <label>APIM Subscription Key (optional)
+          <input id="subscriptionKey" type="password" placeholder="paste key" />
+        </label>
+      </div>
+      <div class="grid two">
+        <label>Foundry Project Endpoint (reference)
+          <input id="foundryProjectEndpoint" type="text" value="https://bhs-development-public-foundry-r.services.ai.azure.com/api/projects/bhs-development-public-foundry" readonly />
+        </label>
+      </div>
+      <details class="advanced">
+        <summary>Advanced policy settings</summary>
+        <div class="grid three">
+          <label>Tokens Per Minute (step 2)
+            <input id="tokensPerMinute" type="number" value="20000" min="1" />
+          </label>
+          <label>Rate Limit Calls (step 2)
+            <input id="rateLimitCalls" type="number" value="30" min="1" />
+          </label>
+          <label>Rate Limit Renewal (step 2)
+            <input id="rateLimitRenewalPeriod" type="number" value="60" min="1" />
+          </label>
+        </div>
+        <div class="grid three">
+          <label>Enforcement Tokens Per Minute (step 4)
+            <input id="enforcementTokensPerMinute" type="number" value="120" min="1" />
+          </label>
+          <label>Enforcement Rate Limit Calls (step 4)
+            <input id="enforcementRateLimitCalls" type="number" value="1" min="1" />
+          </label>
+          <label>Enforcement Renewal (step 4)
+            <input id="enforcementRateLimitRenewalPeriod" type="number" value="60" min="1" />
+          </label>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Wizard Steps</h2>
+      <ol class="steps">
+        <li id="stepItem1" class="step-item current">
+          <div>
+            <strong>Step 1: Create API + Backend + RBAC</strong>
+            <p>Creates workspace API and AOAI backend, then assigns APIM managed identity.</p>
+          </div>
+          <button id="runStep1" class="btn primary">Run Step 1</button>
+        </li>
+        <li id="stepItem2" class="step-item">
+          <div>
+            <strong>Step 2: Apply AI Gateway Policies</strong>
+            <p>Applies managed identity auth, token/rate limits, and metrics policy.</p>
+          </div>
+          <button id="runStep2" class="btn" disabled>Run Step 2</button>
+        </li>
+        <li id="stepItem3" class="step-item">
+          <div>
+            <strong>Step 3: Run Baseline Demo Calls</strong>
+            <p>Invokes endpoint twice to validate end-to-end behavior (no APIM subscription key required).</p>
+          </div>
+          <button id="runStep3" class="btn" disabled>Run Step 3</button>
+        </li>
+        <li id="stepItem4" class="step-item">
+          <div>
+            <strong>Step 4: Run Limit Enforcement Demo</strong>
+            <p>Re-applies restrictive limits and attempts to trigger policy enforcement.</p>
+          </div>
+          <button id="runStep4" class="btn" disabled>Run Step 4</button>
+        </li>
+      </ol>
+      <div class="actions">
+        <button id="resetFlow" class="btn subtle">Reset Step Flow</button>
+      </div>
+    </section>
+
+    <section class="card output-card">
+      <div class="output-header">
+        <h2>Run Output</h2>
+        <span id="statusBadge" class="badge idle">Idle</span>
+      </div>
+      <pre id="output">Ready. Fill context and run Step 1.</pre>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

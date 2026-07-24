@@ -119,7 +119,7 @@ function Resolve-SubscriptionKey {
         return $SubscriptionKey
     }
 
-    throw "SubscriptionKey is required. Pass -SubscriptionKey from an APIM subscription key."
+    return $null
 }
 
 function Invoke-DemoCall {
@@ -127,7 +127,7 @@ function Invoke-DemoCall {
         [Parameter(Mandatory = $true)]
         [string]$Uri,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter()]
         [string]$Key,
 
         [Parameter(Mandatory = $true)]
@@ -156,8 +156,10 @@ function Invoke-DemoCall {
     } | ConvertTo-Json -Depth 8
 
     $headers = @{
-        "Ocp-Apim-Subscription-Key" = $Key
         "Content-Type" = "application/json"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Key)) {
+        $headers["Ocp-Apim-Subscription-Key"] = $Key
     }
 
     $statusCode = $null
